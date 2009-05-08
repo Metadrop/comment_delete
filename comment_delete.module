@@ -1,0 +1,146 @@
+<?php
+/**
+ * Implementation of hook_perm().
+ */
+function comment_delete_perm() {
+  return array(
+    'delete own comments',
+    'delete any comment',
+    'select replies action',
+  );
+}
+
+/**
+ * Implementation of hook_menu().
+ */
+function comment_delete_menu() {
+  $items['admin/content/comment/deletion'] = array(
+    'title' => 'Deletion settings',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('comment_delete_settings_form'),
+    'access arguments' => array('administer comments'),
+    'type' => MENU_LOCAL_TASK,
+    'file' => 'comment_delete.admin.inc',
+  );
+  $items['comment/delete'] = array(
+    'title' => 'Delete comment',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('comment_delete_form'),
+    'access callback' => 'comment_delete_access_check',
+    'access arguments' => array(1),
+    'type' => MENU_CALLBACK,
+  );
+  
+  return $items;
+}
+
+/**
+ * Checks if a user has access to delete a specific comment.
+ */
+function comment_delete_access_check($cid) {
+  global $user;
+  $comment = _comment_load($cid);
+  
+  // Check if user has permission to delete any comment.
+  if (user_access('delete any comment')) {
+    return TRUE;
+  }
+  
+  // User must have delete own comments permission.
+  if (user_access('delete own comments', $user)) {
+    if ($user->uid == $comment->uid) {
+      return TRUE;
+    }
+  }
+  
+  return FALSE;
+}
+
+/**
+ * Confirmation form for deleting a comment.
+ */
+function comment_delete_form($form_state, $cid) {  
+  $comment = _comment_load($cid);
+  
+  if ($comment->cid) { 
+    // Store the comment ID for the submit processor.
+    $form['cid'] = array(
+      '#type' => 'hidden',
+      '#value' => $cid,
+    );
+    
+    // Allow permissible users to determine how replies of this comment should be handled when
+    // it is deleted. Users without permissions to change this will use the default setting.
+    if (user_access('select replies action')) {
+      $form['replies'] = array(
+        '#type' => 'select',
+        '#title' => t('Action for replies'),
+        '#description' => t('Specify how replies should be handled by default when deleting a comment.'),
+        '#options' => array(
+          0 => t('Delete all replies of the comment'),
+          1 => t('Move all replies up one level'),
+        ),
+        '#required' => TRUE,
+        '#default_value' => variable_get('comment_delete_replies', 0),
+      );
+    }
+    else {
+      $form['replies'] = array(
+        '#type' => 'hidden',
+        '#value' => variable_get('comment_delete_replies', 0),
+      );
+    }
+
+    // Return the form as a confirmation.
+    $msg = t("Are you sure you want to delete the comment %title?", array('%title' => $comment->subject));
+    return confirm_form($form, $msg, "node/{$comment->nid}", NULL, t('Delete'));
+  }
+  
+  // Comment doesn't exist, could be due to a faulty link or someone beat them to the punch.
+  // Lets get them off this page and let them know the comment wasn't found.
+  else {
+    drupal_set_message(t('This comment no longer exists.'));
+    drupal_goto('');
+  }
+}
+
+/**
+ * Delete the comment and manage the replies using the appropiate action.
+ */
+function comment_delete_form_submit($form, &$form_state) {  
+  include_once(drupal_get_path('module', 'comment') .'/comment.admin.inc');
+  $comment = _comment_load($form_state['values']['cid']);
+  
+  // Delete the comment and all of it's replies.
+  if (!$form_state['values']['replies']) {
+    _comment_delete_thread($comment);
+    _comment_update_node_statistics($comment->nid);
+    drupal_set_message(t('The comment and all its replies have been deleted.'));
+  }
+  
+  // Delete the comment and move the replies up one level.
+  else {
+    comment_delete_move_replies($comment);
+    _comment_delete_thread($comment);
+    drupal_set_message(t("The comment has been deleted and it's replies have been moved up one level."));
+  }
+  
+  cache_clear_all();
+  $form_state['redirect'] = "node/$comment->nid";
+}
+
+/**
+ * Moves replies of a comment up one level.
+ */
+function comment_delete_move_replies($comment, $old_cid = 0) {
+  $parent_id = $comment->pid;
+  $results = db_query("SELECT * FROM {comments} WHERE pid = %d", ($old_cid ? $old_cid : $comment->cid));
+  while ($edit = db_fetch_array($results)) {
+    $old_cid = $edit['cid'];
+    unset($edit['cid']);
+    $edit['pid'] = $parent_id;    
+    $new_cid = comment_save($edit);
+    $new_comment = _comment_load($new_cid);
+    comment_delete_move_replies($new_comment, $old_cid);
+  }
+}
