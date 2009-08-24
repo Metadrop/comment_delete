@@ -27,7 +27,7 @@ function comment_delete_menu() {
     'page callback' => 'drupal_get_form',
     'page arguments' => array('comment_delete_form'),
     'access callback' => 'comment_delete_access_check',
-    'access arguments' => array(1),
+    'access arguments' => array(2),
     'type' => MENU_CALLBACK,
   );
   
@@ -38,6 +38,8 @@ function comment_delete_menu() {
  * Checks if a user has access to delete a specific comment.
  */
 function comment_delete_access_check($cid) {
+  if (empty($cid)) return FALSE;
+
   global $user;
   $comment = _comment_load($cid);
   
@@ -143,4 +145,24 @@ function comment_delete_move_replies($comment, $old_cid = 0) {
     $new_comment = _comment_load($new_cid);
     comment_delete_move_replies($new_comment, $old_cid);
   }
+}
+
+/**
+ * Implementation of hook_link().
+ */
+function comment_delete_link($type, $comment = NULL, $teaser = FALSE) {
+  $links = array();
+
+  if ($type == 'comment' && !user_access('administer comments')) {
+    if (node_comment_mode($comment->nid) == COMMENT_NODE_READ_WRITE) {
+      if (comment_delete_access_check($comment->cid)) {
+        $links['comment_delete'] = array(
+          'title' => t('delete'),
+          'href' => "comment/delete/$comment->cid"
+        );
+      }
+    }
+  }
+
+  return $links;
 }
