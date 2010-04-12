@@ -1,4 +1,6 @@
 <?php
+// $Id$ 
+
 /**
  * Settings for comment deletion.
  */
