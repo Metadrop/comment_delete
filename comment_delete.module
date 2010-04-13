@@ -7,7 +7,9 @@
 function comment_delete_perm() {
   return array(
     'delete own comments',
+    'delete own comments at anytime',
     'delete any comment',
+    'delete any comments at anytime',
     'delete all comment replies',
     'move all replies up',
   );
@@ -46,13 +48,19 @@ function comment_delete_access_check($cid) {
   global $user;
   $comment = _comment_load($cid);
   
+  // Determine if the deletion clock should be used.
+  $clock_expired = FALSE;
+  if ($clock = variable_get('comment_delete_clock', 0)) {
+    $clock_expired = (time() - $comment->timestamp) > $clock;
+  }
+  
   // Check if user has permission to delete any comment.
-  if (user_access('delete any comment')) {
+  if ((user_access('delete any comment') && !$clock_expired) || user_access('delete any comments at anytime')) {
     return TRUE;
   }
   
   // User must have delete own comments permission.
-  if (user_access('delete own comments', $user)) {
+  if ((user_access('delete own comments', $user) && !$clock_expired) || user_access('delete own comments at anytime')) {
     if ($user->uid == $comment->uid) {
       return TRUE;
     }
