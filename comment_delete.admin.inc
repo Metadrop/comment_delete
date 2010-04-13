@@ -12,6 +12,7 @@ function comment_delete_settings_form() {
     '#options' => array(
       0 => t('Delete all replies of the comment'),
       1 => t('Move all replies up one level'),
+      2 => t('Delete only the comment, or it\'s text and the subject if it has replies'),
     ),
     '#required' => TRUE,
     '#default_value' => variable_get('comment_delete_replies', 0),
@@ -19,7 +20,7 @@ function comment_delete_settings_form() {
   $form['comment_delete_clock'] = array(
     '#type' => 'textfield',
     '#title' => t('Deletion clock'),
-    '#description' => t("Enter a time in seconds that a user can delete a comment after it's creation."),
+    '#description' => t('Enter a time in seconds that a user can delete a comment after it\'s creation.'),
     '#size' => 10,
     '#default_value' => variable_get('comment_delete_clock', 0),
   );
