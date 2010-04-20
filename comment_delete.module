@@ -27,16 +27,19 @@ function comment_delete_menu() {
     'type' => MENU_LOCAL_TASK,
     'file' => 'comment_delete.admin.inc',
   );
-  $items['comment/delete'] = array(
-    'title' => 'Delete comment',
-    'page callback' => 'drupal_get_form',
-    'page arguments' => array('comment_delete_form'),
-    'access callback' => 'comment_delete_access_check',
-    'access arguments' => array(2),
-    'type' => MENU_CALLBACK,
-  );
   
   return $items;
+}
+
+/**
+ * Implementation of hook_menu_alter().
+ */
+function comment_delete_menu_alter(&$items) {
+  $items['comment/delete']['page callback'] = 'drupal_get_form';
+  $items['comment/delete']['page arguments'] = array('comment_delete_form');
+  $items['comment/delete']['access callback'] = 'comment_delete_access_check';
+  $items['comment/delete']['access arguments'] = array(2);
+  unset($items['comment/delete']['file']);
 }
 
 /**
