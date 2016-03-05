@@ -1,15 +1,19 @@
 <?php
+/**
+ * @file
+ * comment_delete.install
+ */
 
 /**
- * Implementation of hook_install().
+ * Implements hook_install().
  */
 function comment_delete_install() {
-  db_query("UPDATE {system} SET weight = 1 WHERE name = 'comment_delete'");
+  module_set_weight('comment_delete', 1000);
 }
 
 /**
- * Implementation of hook_uninstall().
+ * Implements hook_uninstall().
  */
 function comment_delete_uninstall() {
-  
+  \Drupal::configFactory()->getEditable('comment_delete.config')->delete();
 }
