@@ -1,17 +1,10 @@
 <?php
 
-/**
- * @file
- * Contains \Drupal\comment_delete\Access\CommentDeleteAccessCheck.
- */
-
 namespace Drupal\comment_delete\Access;
 
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Routing\Access\AccessInterface;
 use Drupal\Core\Session\AccountInterface;
-use Symfony\Component\Routing\Route;
-use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Checks access for displaying configuration translation page.

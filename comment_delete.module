@@ -2,19 +2,22 @@
 
 /**
  * @file
- * Provide advanced comment deletion abilities.
+ * comment_delete.module
  */
 
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\Component\Utility\Number;
+use Drupal\comment\CommentInterface;
 
 /**
  * Checks user account access to delete a comment.
  *
- * @param $account object
+ * @param object $account
  *   User account object to check access.
- * @param $comment object
+ * @param object $comment
  *   Comment entity object to check access.
- * @return boolean
+ *
+ * @return bool
  *   Returns TRUE or FALSE based on access checks.
  */
 function comment_delete_check_access($account, $comment) {
@@ -42,7 +45,7 @@ function comment_delete_check_access($account, $comment) {
 /**
  * Implements hook_comment_links_alter().
  */
-function comment_delete_comment_links_alter(&$links, \Drupal\comment\CommentInterface $entity, &$context) {
+function comment_delete_comment_links_alter(array &$links, CommentInterface $entity, &$context) {
   $account = \Drupal::currentUser();
 
   // Remove delete link if user doesn't have access.
@@ -54,14 +57,17 @@ function comment_delete_comment_links_alter(&$links, \Drupal\comment\CommentInte
 /**
  * Implements hook_form_alter().
  */
-function comment_delete_form_alter(&$form, \Drupal\Core\Form\FormStateInterface $form_state, $form_id) {
-  if (preg_match('/comment_(.*)_delete_form/i', $form_id)) {
+function comment_delete_form_alter(&$form, FormStateInterface $form_state, $form_id) {
+  $current_path = \Drupal::service('path.current')->getPath();
+  $path_args = explode('/', $current_path);
+
+  if ($path_args[1] != 'admin' && preg_match('/comment_(.*)_delete_form/i', $form_id)) {
     $config = \Drupal::config('comment_delete.config');
     $default = $config->get('default_selection');
     unset($form['description']);
 
     // Define available comment deletion options.
-    $options = array();
+    $options = [];
     if (\Drupal::currentUser()->hasPermission('delete comment replies')) {
       $options[0] = t('Delete comment and replies');
     }
@@ -72,32 +78,32 @@ function comment_delete_form_alter(&$form, \Drupal\Core\Form\FormStateInterface 
 
     // Provide comment deletion radio options.
     if (count($options) > 1) {
-      $form['delete_action'] = array(
+      $form['delete_action'] = [
         '#type' => 'radios',
         '#title' => t('How should replies to this comment be handled?'),
         '#options' => $options,
         '#required' => TRUE,
         '#default_value' => isset($options[$default]) ? $default : 2,
-      );
+      ];
     }
 
     // Perform default action when access is limited.
     else {
-      $form['delete_action'] = array(
+      $form['delete_action'] = [
         '#type' => 'hidden',
         '#value' => 2,
-      );
+      ];
     }
 
     // Override default comment delete submit callbacks.
-    $form['actions']['submit']['#submit'] = array('comment_delete_form_submit');
+    $form['actions']['submit']['#submit'] = ['comment_delete_form_submit'];
   }
 }
 
 /**
  * Submit callback for comment deletion form.
  */
-function comment_delete_form_submit(&$form, \Drupal\Core\Form\FormStateInterface $form_state) {
+function comment_delete_form_submit(&$form, FormStateInterface $form_state) {
   $config = \Drupal::config('comment_delete.config');
   $args = explode('/', trim(\Drupal::service('path.current')->getPath(), '/'));
   $comment = entity_load('comment', $args[1]);
@@ -126,23 +132,27 @@ function comment_delete_form_submit(&$form, \Drupal\Core\Form\FormStateInterface
   switch ($comment->getCommentedEntityTypeId()) {
     case 'node':
       $route_name = 'entity.node.canonical';
-      $route_params = array('node' => $entity_id);
+      $route_params = ['node' => $entity_id];
       break;
+
     case 'taxonomy_term':
       $route_name = 'entity.taxonomy_term.canonical';
-      $route_params = array('taxonomy_term' => $entity_id);
+      $route_params = ['taxonomy_term' => $entity_id];
       break;
+
     case 'user':
       $route_name = 'entity.user.canonical';
-      $route_params = array('user' => $entity_id);
+      $route_params = ['user' => $entity_id];
       break;
+
     case 'comment':
       $route_name = 'entity.comment.canonical';
-      $route_params = array('comment' => $entity_id);
+      $route_params = ['comment' => $entity_id];
       break;
+
     default:
       $route_name = '<front>';
-      $route_params = array();
+      $route_params = [];
       break;
   }
   $form_state->setRedirect($route_name, $route_params);
@@ -152,14 +162,14 @@ function comment_delete_form_submit(&$form, \Drupal\Core\Form\FormStateInterface
 /**
  * Removes comment subject/body to retain replies thread order.
  *
- * @param $comment object
+ * @param object $comment
  *   Loaded comment entity object.
  */
 function comment_delete_keep_replies($comment) {
 
   // Retrieve first-level comment replies count.
   $results = db_select('comment_field_data', 'c')
-    ->fields('c', array('cid'))
+    ->fields('c', ['cid'])
     ->condition('c.pid', $comment->id(), '=')
     ->countQuery()
     ->execute()->fetchField();
@@ -180,14 +190,14 @@ function comment_delete_keep_replies($comment) {
 /**
  * Removes parent comment and moves replies up a thread level.
  *
- * @param $comment object
+ * @param object $comment
  *   Loaded comment entity object.
  */
 function comment_delete_move_replies($comment) {
 
   // Retrieve all first-level comment replies to be updated.
   $results = db_select('comment_field_data', 'c')
-    ->fields('c', array('cid', 'created'))
+    ->fields('c', ['cid', 'created'])
     ->condition('c.pid', $comment->id(), '=')
     ->execute();
 
@@ -213,17 +223,17 @@ function comment_delete_move_replies($comment) {
 /**
  * Re-threads comments attached to an entity.
  *
- * @param $entity_type string
+ * @param string $entity_type
  *   The entity type to load.
- * @param $entity_id int
+ * @param int $entity_id
  *   The entity ID to load.
  */
 function comment_delete_threading($entity_type, $entity_id) {
-  $comments = array();
+  $comments = [];
 
   // Retrieve all comments attached to entity.
   $results = db_select('comment_field_data', 'c')
-    ->fields('c', array('cid', 'pid', 'created'))
+    ->fields('c', ['cid', 'pid', 'created'])
     ->condition('c.entity_type', $entity_type)
     ->condition('c.entity_id', $entity_id)
     ->orderBy('c.created', 'ASC')
@@ -239,7 +249,7 @@ function comment_delete_threading($entity_type, $entity_id) {
   // Update comment threads in database table.
   foreach ($threads as $cid => $thread_string) {
     db_update('comment_field_data')
-      ->fields(array('thread' => $thread_string .'/'))
+      ->fields(['thread' => $thread_string . '/'])
       ->condition('cid', $cid)
       ->execute();
   }
@@ -248,15 +258,16 @@ function comment_delete_threading($entity_type, $entity_id) {
 /**
  * Creates associative array of threaded comments.
  *
- * @param $comments array
+ * @param array $comments
  *   Flat array of entity comments.
- * @param $pid int
+ * @param int $pid
  *   Parent ID used to recursively create array.
+ *
  * @return array
  *   Associative array of threaded comments.
  */
 function comment_delete_threading_tree(array $comments, $pid = 0) {
-  $branch = array();
+  $branch = [];
   foreach ($comments as $comment) {
     if ($comment['pid'] == $pid) {
       $children = comment_delete_threading_tree($comments, $comment['cid']);
@@ -272,20 +283,21 @@ function comment_delete_threading_tree(array $comments, $pid = 0) {
 /**
  * Converts threaded comments into associative array of thread strings.
  *
- * @param $tree array
+ * @param array $tree
  *   Associtiave array containing comment threading tree.
- * @param $prefix string
+ * @param string $prefix
  *   Prefix to be prepended to thread strings.
- * @param $threading array
+ * @param array $threading
  *   Associative array of existing thread strings.
+ *
  * @return array
  *   Accociative array of comment thread strings.
  */
-function comment_delete_threading_values($tree, $prefix = '', $threading = array(), $init = TRUE) {
+function comment_delete_threading_values(array $tree, $prefix = '', array $threading = [], $init = TRUE) {
   $thread = $init ? '01' : '00';
   uasort($tree, 'comment_delete_threading_sort');
   foreach ($tree as $comment) {
-    $string = (!empty($prefix) ? $prefix .'.' : '') . Number::intToAlphadecimal(sprintf('%02d', $thread++));
+    $string = (!empty($prefix) ? $prefix . '.' : '') . Number::intToAlphadecimal(sprintf('%02d', $thread++));
     $threading[$comment['cid']] = $string;
     if (isset($comment['children'])) {
       $children = $comment['children'];

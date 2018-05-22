@@ -1,10 +1,5 @@
 <?php
 
-/**
- * @file
- * Contains \Drupal\comment_delete\Form\CommentDeleteSettingsForm.
- */
-
 namespace Drupal\comment_delete\Form;
 
 use Drupal\Core\Form\ConfigFormBase;
@@ -34,37 +29,37 @@ class CommentDeleteSettingsForm extends ConfigFormBase {
    */
   public function buildForm(array $form, FormStateInterface $form_state) {
     $config = $this->config('comment_delete.config');
-    $form['settings'] = array(
+    $form['settings'] = [
       '#type' => 'fieldset',
       '#title' => t('Settings'),
-    );
-    $form['settings']['comment_delete_default'] = array(
+    ];
+    $form['settings']['comment_delete_default'] = [
       '#type' => 'radios',
       '#title' => t('Default Delete Option'),
-      '#description' => t('Choose which option to use as the selected default when deleting comments.'),
-      '#options' => array(
+      '#description' => t('Choose the default option selected when a comments deleted.'),
+      '#options' => [
         0 => t('Delete comment and replies'),
         1 => t('Delete comment and move replies up'),
         2 => t('Delete comment and keep replies'),
-      ),
+      ],
       '#required' => TRUE,
       '#default_value' => $config->get('default_selection'),
-    );
-    $form['settings']['comment_delete_threshold'] = array(
+    ];
+    $form['settings']['comment_delete_threshold'] = [
       '#type' => 'textfield',
-      '#title' => t('Delete Threshold'),
-      '#description' => t('Define allowable comment deletion threshold in seconds. Enter zero (0) to disable.'),
+      '#title' => t('Threshold Period'),
+      '#description' => t('Max allowable time comments can be deleted after creation. Enter zero (0) to disable.'),
       '#size' => 10,
       '#default_value' => $config->get('threshold'),
       '#required' => TRUE,
-    );
-    $form['settings']['comment_delete_message'] = array(
+    ];
+    $form['settings']['comment_delete_message'] = [
       '#type' => 'textarea',
-      '#title' => t('Delete Confirmation Message'),
-      '#description' => t('Enter message which is displayed after successfully removing comment.'),
+      '#title' => t('Confirmation Message'),
+      '#description' => t('Customize confirmation message shown after comment has been deleted.'),
       '#default_value' => $config->get('message'),
       '#required' => TRUE,
-    );
+    ];
     return parent::buildForm($form, $form_state);
   }
 

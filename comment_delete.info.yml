@@ -1,5 +1,5 @@
 name: 'Comment Delete'
-description: 'Enhances user comment deletion capabilities.'
+description: 'Adds individual comment and comment thread delete options.'
 type: module
 core: 8.x
 configure: comment_delete.admin

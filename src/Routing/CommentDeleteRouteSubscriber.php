@@ -1,10 +1,5 @@
 <?php
 
-/**
- * @file
- * Contains \Drupal\comment_delete\Routing\CommentDeleteRouteSubscriber.
- */
-
 namespace Drupal\comment_delete\Routing;
 
 use Drupal\Core\Routing\RouteSubscriberBase;
@@ -22,9 +17,9 @@ class CommentDeleteRouteSubscriber extends RouteSubscriberBase {
 
     // Set custom access check on comment delete form route.
     if ($route = $collection->get('entity.comment.delete_form')) {
-      $route->setRequirements(array(
+      $route->setRequirements([
         '_comment_delete_access_check' => 'TRUE',
-      ));
+      ]);
     }
   }
 
