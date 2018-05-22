@@ -97,7 +97,7 @@ function comment_delete_form_submit(&$form, FormStateInterface $form_state) {
 
     // Delete comment and replies. Default D8 behavior.
     case 0:
-      $comment->delete();
+      comment_delete_remove_replies($comment);
       break;
 
     // Delete comment and move replies.
@@ -144,12 +144,56 @@ function comment_delete_form_submit(&$form, FormStateInterface $form_state) {
 }
 
 /**
+ * Removes comment subject/body values.
+ *
+ * @param object $comment
+ *   Fully loaded comment object.
+ */
+function comment_delete_soft_remove($comment) {
+  $comment->set('subject', '');
+  $comment->set('comment_body', '');
+  $comment->save();
+}
+
+/**
+ * Removes comment and all replies.
+ *
+ * @param object $comment
+ *   Loaded comment entity object.
+ */
+function comment_delete_remove_replies($comment) {
+  $config = \Drupal::config('comment_delete.config');
+
+  // Permanantely delete comment and replies.
+  if (!$config->get('soft')) {
+    $comment->delete();
+    return;
+  }
+  $entity_reference = $comment->entity_id->getValue();
+  $thread = $comment->thread->getValue();
+
+  // Soft delete comment and replies.
+  $query = db_select('comment_field_data', 'c')
+    ->fields('c', ['cid'])
+    ->condition('c.entity_id', $entity_reference[0]['target_id']);
+  $db_or = db_or();
+  $db_or->condition('c.thread', $thread[0]['value']);
+  $db_or->condition('c.thread', str_replace('/', '.', $thread[0]['value']) . '%', 'LIKE');
+  $query->condition($db_or);
+
+  foreach ($query->execute() as $reply) {
+    comment_delete_soft_remove(entity_load('comment', $reply->cid));
+  }
+}
+
+/**
  * Removes comment subject/body to retain replies thread order.
  *
  * @param object $comment
  *   Loaded comment entity object.
  */
 function comment_delete_keep_replies($comment) {
+  $config = \Drupal::config('comment_delete.config');
 
   // Retrieve first-level comment replies count.
   $results = db_select('comment_field_data', 'c')
@@ -167,7 +211,12 @@ function comment_delete_keep_replies($comment) {
 
   // Remove entire comment when no replies exist.
   else {
-    $comment->delete();
+    if (!$config->get('soft')) {
+      $comment->delete();
+    }
+    else {
+      comment_delete_soft_remove($comment);
+    }
   }
 }
 
@@ -178,6 +227,7 @@ function comment_delete_keep_replies($comment) {
  *   Loaded comment entity object.
  */
 function comment_delete_move_replies($comment) {
+  $config = \Drupal::config('comment_delete.config');
 
   // Retrieve all first-level comment replies to be updated.
   $results = db_select('comment_field_data', 'c')
@@ -198,7 +248,12 @@ function comment_delete_move_replies($comment) {
   }
 
   // Delete the parent comment entity.
-  $comment->delete();
+  if (!$config->get('soft')) {
+    $comment->delete();
+  }
+  else {
+    comment_delete_soft_remove($comment);
+  }
 
   // Re-thread comments attached to entity.
   comment_delete_threading($comment->getCommentedEntityTypeId(), $comment->getCommentedEntityId());

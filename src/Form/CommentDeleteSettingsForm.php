@@ -29,11 +29,7 @@ class CommentDeleteSettingsForm extends ConfigFormBase {
    */
   public function buildForm(array $form, FormStateInterface $form_state) {
     $config = $this->config('comment_delete.config');
-    $form['settings'] = [
-      '#type' => 'fieldset',
-      '#title' => t('Settings'),
-    ];
-    $form['settings']['comment_delete_default'] = [
+    $form['comment_delete_default'] = [
       '#type' => 'radios',
       '#title' => t('Default Delete Option'),
       '#description' => t('Choose the default option selected when a comments deleted.'),
@@ -45,7 +41,13 @@ class CommentDeleteSettingsForm extends ConfigFormBase {
       '#required' => TRUE,
       '#default_value' => $config->get('default_selection'),
     ];
-    $form['settings']['comment_delete_threshold'] = [
+    $form['comment_delete_soft'] = [
+      '#type' => 'checkbox',
+      '#title' => t('Soft delete comments'),
+      '#description' => t('When enabled the comment subject+body is cleared but comment+author is retained.'),
+      '#default_value' => $config->get('soft'),
+    ];
+    $form['comment_delete_threshold'] = [
       '#type' => 'textfield',
       '#title' => t('Threshold Period'),
       '#description' => t('Max allowable time comments can be deleted after creation. Enter zero (0) to disable.'),
@@ -53,7 +55,7 @@ class CommentDeleteSettingsForm extends ConfigFormBase {
       '#default_value' => $config->get('threshold'),
       '#required' => TRUE,
     ];
-    $form['settings']['comment_delete_message'] = [
+    $form['comment_delete_message'] = [
       '#type' => 'textarea',
       '#title' => t('Confirmation Message'),
       '#description' => t('Customize confirmation message shown after comment has been deleted.'),
@@ -91,6 +93,7 @@ class CommentDeleteSettingsForm extends ConfigFormBase {
   public function submitForm(array &$form, FormStateInterface $form_state) {
     $this->config('comment_delete.config')
       ->set('default_selection', $form_state->getValue('comment_delete_default'))
+      ->set('soft', $form_state->getValue('comment_delete_soft'))
       ->set('threshold', $form_state->getValue('comment_delete_threshold'))
       ->set('message', $form_state->getValue('comment_delete_message'))
       ->save();
