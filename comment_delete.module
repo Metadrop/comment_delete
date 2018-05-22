@@ -5,53 +5,37 @@
  * comment_delete.module
  */
 
+use Drupal\Core\Access\AccessResult;
+use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Component\Utility\Number;
-use Drupal\comment\CommentInterface;
 
 /**
- * Checks user account access to delete a comment.
- *
- * @param object $account
- *   User account object to check access.
- * @param object $comment
- *   Comment entity object to check access.
- *
- * @return bool
- *   Returns TRUE or FALSE based on access checks.
+ * Implements hook_ENTITY_TYPE_access().
  */
-function comment_delete_check_access($account, $comment) {
+function comment_delete_comment_access(EntityInterface $entity, $operation, AccountInterface $account) {
   $config = \Drupal::config('comment_delete.config');
 
-  // Calculate allowable comment deletion threshold.
-  $threshold_setting = $config->get('threshold');
-  $threshold = $threshold_setting ? (time() - $comment->get('created')->value) > $threshold_setting : 0;
+  // Check users comment delete permissions.
+  if ($operation == 'delete') {
+    $threshold_setting = $config->get('threshold');
+    $threshold = $threshold_setting ? (time() - $entity->get('created')->value) > $threshold_setting : 0;
 
-  // Check permissions for any comment.
-  if (($account->hasPermission('delete any comment') && !$threshold) || $account->hasPermission('delete any comment anytime')) {
-    return TRUE;
-  }
+    // Check delete any comment permission.
+    if (($account->hasPermission('delete any comment') && !$threshold) || $account->hasPermission('delete any comment anytime')) {
+      return AccessResult::allowed();
+    }
 
-  // Check permissions for users own comment.
-  if ($comment->get('uid')->target_id == $account->id()) {
-    if (($account->hasPermission('delete own comment') && !$threshold) || $account->hasPermission('delete own comment anytime')) {
-      return TRUE;
+    // Check delete own comment permission.
+    if ($entity->get('uid')->target_id == $account->id()) {
+      if (($account->hasPermission('delete own comment') && !$threshold) || $account->hasPermission('delete own comment anytime')) {
+        return AccessResult::allowed();
+      }
     }
   }
 
-  return FALSE;
-}
-
-/**
- * Implements hook_comment_links_alter().
- */
-function comment_delete_comment_links_alter(array &$links, CommentInterface $entity, &$context) {
-  $account = \Drupal::currentUser();
-
-  // Remove delete link if user doesn't have access.
-  if (!comment_delete_check_access($account, $entity)) {
-    unset($links['comment']['#links']['comment-delete']);
-  }
+  return AccessResult::neutral();
 }
 
 /**
