@@ -90,7 +90,7 @@ function comment_delete_form_alter(&$form, FormStateInterface $form_state, $form
 function comment_delete_form_submit(&$form, FormStateInterface $form_state) {
   $config = \Drupal::config('comment_delete.config');
   $args = explode('/', trim(\Drupal::service('path.current')->getPath(), '/'));
-  $comment = entity_load('comment', $args[1]);
+  $comment = \Drupal::entityTypeManager()->getStorage('comment')->load($args[1]);
 
   // Perform chosen comment delete actions.
   switch ($form_state->getValue('delete_action')) {
@@ -140,7 +140,7 @@ function comment_delete_form_submit(&$form, FormStateInterface $form_state) {
       break;
   }
   $form_state->setRedirect($route_name, $route_params);
-  drupal_set_message(t($config->get('message')));
+  \Drupal::messenger()->addMessage(t($config->get('message')));
 }
 
 /**
@@ -173,16 +173,16 @@ function comment_delete_remove_replies($comment) {
   $thread = $comment->thread->getValue();
 
   // Soft delete comment and replies.
-  $query = db_select('comment_field_data', 'c')
+  $query = \Drupal::database()->select('comment_field_data', 'c')
     ->fields('c', ['cid'])
     ->condition('c.entity_id', $entity_reference[0]['target_id']);
-  $db_or = db_or();
+  $db_or = new Condition('OR');
   $db_or->condition('c.thread', $thread[0]['value']);
   $db_or->condition('c.thread', str_replace('/', '.', $thread[0]['value']) . '%', 'LIKE');
   $query->condition($db_or);
 
   foreach ($query->execute() as $reply) {
-    comment_delete_soft_remove(entity_load('comment', $reply->cid));
+    comment_delete_soft_remove(\Drupal::entityTypeManager()->getStorage('comment')->load($reply->cid));
   }
 }
 
@@ -196,7 +196,7 @@ function comment_delete_keep_replies($comment) {
   $config = \Drupal::config('comment_delete.config');
 
   // Retrieve first-level comment replies count.
-  $results = db_select('comment_field_data', 'c')
+  $results = \Drupal::database()->select('comment_field_data', 'c')
     ->fields('c', ['cid'])
     ->condition('c.pid', $comment->id(), '=')
     ->countQuery()
@@ -230,14 +230,14 @@ function comment_delete_move_replies($comment) {
   $config = \Drupal::config('comment_delete.config');
 
   // Retrieve all first-level comment replies to be updated.
-  $results = db_select('comment_field_data', 'c')
+  $results = \Drupal::database()->select('comment_field_data', 'c')
     ->fields('c', ['cid', 'created'])
     ->condition('c.pid', $comment->id(), '=')
     ->execute();
 
   // Update parent comment target ID.
   foreach ($results as $data) {
-    $reply_comment = entity_load('comment', $data->cid);
+    $reply_comment = \Drupal::entityTypeManager()->getStorage('comment')->load($data->cid);
     if ($comment->get('pid')->target_id) {
       $reply_comment->set('pid', $comment->get('pid')->target_id);
     }
@@ -269,9 +269,9 @@ function comment_delete_move_replies($comment) {
  */
 function comment_delete_threading($entity_type, $entity_id) {
   $comments = [];
-
+  $database = \Drupal::database();
   // Retrieve all comments attached to entity.
-  $results = db_select('comment_field_data', 'c')
+  $results = $database->select('comment_field_data', 'c')
     ->fields('c', ['cid', 'pid', 'created'])
     ->condition('c.entity_type', $entity_type)
     ->condition('c.entity_id', $entity_id)
@@ -287,7 +287,7 @@ function comment_delete_threading($entity_type, $entity_id) {
 
   // Update comment threads in database table.
   foreach ($threads as $cid => $thread_string) {
-    db_update('comment_field_data')
+    $database->update('comment_field_data')
       ->fields(['thread' => $thread_string . '/'])
       ->condition('cid', $cid)
       ->execute();
